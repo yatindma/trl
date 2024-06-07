@@ -105,6 +105,8 @@ if TYPE_CHECKING:
         DataCollatorForCompletionOnlyLM,
         DPOConfig,
         DPOTrainer,
+        SPOConfig,
+        SPOTrainer,
         CPOConfig,
         CPOTrainer,
         IterativeSFTTrainer,
