@@ -31,6 +31,8 @@ _import_structure = {
     ],
     "dpo_config": ["DPOConfig"],
     "dpo_trainer": ["DPOTrainer"],
+    "spo_trainer": ["SPOTrainer"],
+    "spo_config": ["SPOConfig"],
     "cpo_config": ["CPOConfig"],
     "cpo_trainer": ["CPOTrainer"],
     "iterative_sft_trainer": ["IterativeSFTTrainer"],
