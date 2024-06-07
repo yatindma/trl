@@ -39,9 +39,9 @@ from transformers.trainer_callback import TrainerCallback
 from transformers.trainer_utils import EvalLoopOutput
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
-from .spo_config import DPOConfig
+from .spo_config import SPOConfig
 from .utils import (
-    SPODataCollatorWithPadding,
+    DPODataCollatorWithPadding,
     RunningMoments,
     SyncRefModelCallback,
     disable_dropout_in_model,
