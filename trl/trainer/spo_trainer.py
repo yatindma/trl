@@ -398,7 +398,7 @@ class SPOTrainer(Trainer):
             )
             args.label_pad_token_id = label_pad_token_id
         if data_collator is None:
-            data_collator = SPODataCollatorWithPadding(
+            data_collator = DPODataCollatorWithPadding(
                 pad_token_id=tokenizer.pad_token_id,
                 label_pad_token_id=args.label_pad_token_id,
                 is_encoder_decoder=self.is_encoder_decoder,
