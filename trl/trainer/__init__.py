@@ -78,6 +78,8 @@ if TYPE_CHECKING:
 
     from .dpo_config import DPOConfig
     from .dpo_trainer import DPOTrainer
+    from .spo_trainer import SPOTrainer
+    from .spo_config import SPOConfig
     from .iterative_sft_trainer import IterativeSFTTrainer
     from .cpo_config import CPOConfig
     from .cpo_trainer import CPOTrainer
