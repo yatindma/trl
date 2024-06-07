@@ -36,6 +36,8 @@ _import_structure = {
     "trainer": [
         "DataCollatorForCompletionOnlyLM",
         "DPOConfig",
+        "SPOConfig",
+        "SPOTrainer",
         "DPOTrainer",
         "CPOConfig",
         "CPOTrainer",
