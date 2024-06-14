@@ -1007,33 +1007,27 @@ class SPOTrainer(Trainer):
         ref_logratios = ref_logratios.to(self.accelerator.device)
         logits = pi_logratios - ref_logratios
 
-        # The beta is a temperature parameter for the SPO loss, typically something in the range of 0.1 to 0.5.
-        # We ignore the reference model as beta -> 0. The label_smoothing parameter encodes our uncertainty about the labels and
-        # calculates a conservative SPO loss.
         if self.loss_type == "sigmoid":
-            losses = (
+            base_loss = (
                     -F.logsigmoid(self.beta * logits) * (1 - self.label_smoothing)
                     - F.logsigmoid(-self.beta * logits) * self.label_smoothing
             )
         elif self.loss_type == "robust":
-            losses = (
-                             -F.logsigmoid(self.beta * logits) * (1 - self.label_smoothing)
-                             + F.logsigmoid(-self.beta * logits) * self.label_smoothing
-                     ) / (1 - 2 * self.label_smoothing)
+            base_loss = (
+                                -F.logsigmoid(self.beta * logits) * (1 - self.label_smoothing)
+                                + F.logsigmoid(-self.beta * logits) * self.label_smoothing
+                        ) / (1 - 2 * self.label_smoothing)
         elif self.loss_type == "hinge":
-            losses = torch.relu(1 - self.beta * logits)
+            base_loss = torch.relu(1 - self.beta * logits)
         elif self.loss_type == "ipo":
-            # eqn (17) of the paper where beta is the regularization parameter for the IPO loss, denoted by tau in the paper.
-            losses = (logits - 1 / (2 * self.beta)) ** 2
+            base_loss = (logits - 1 / (2 * self.beta)) ** 2
         elif self.loss_type == "kto_pair":
-            # eqn (7) of the HALOs paper
             chosen_KL = (policy_chosen_logps - reference_chosen_logps).mean().clamp(min=0)
             rejected_KL = (policy_rejected_logps - reference_rejected_logps).mean().clamp(min=0)
 
             chosen_logratios = policy_chosen_logps - reference_chosen_logps
             rejected_logratios = policy_rejected_logps - reference_rejected_logps
-            # As described in the KTO report, the KL term for chosen (rejected) is estimated using the rejected (chosen) half.
-            losses = torch.cat(
+            base_loss = torch.cat(
                 (
                     1 - F.sigmoid(self.beta * (chosen_logratios - rejected_KL)),
                     1 - F.sigmoid(self.beta * (chosen_KL - rejected_logratios)),
@@ -1050,19 +1044,18 @@ class SPOTrainer(Trainer):
             self.running.update(rewards)
             delta = self.running.mean
 
-            losses = -F.logsigmoid((self.beta * chosen_logratios) - delta) - F.logsigmoid(
+            base_loss = -F.logsigmoid((self.beta * chosen_logratios) - delta) - F.logsigmoid(
                 -(self.beta * rejected_logratios - delta)
             )
         elif self.loss_type == "sppo_hard":
-            # In the paper (https://arxiv.org/pdf/2405.00675), SPPO employs a soft probability approach, estimated using the PairRM score. The probability calculation is conducted outside of the trainer class. The version described here is the hard probability version, where P in Equation (4.7) of Algorithm 1 is set to 1 for the winner and 0 for the loser.
             a = policy_chosen_logps - reference_chosen_logps
             b = policy_rejected_logps - reference_rejected_logps
 
-            losses = (a - 0.5 / self.beta) ** 2 + (b + 0.5 / self.beta) ** 2
+            base_loss = (a - 0.5 / self.beta) ** 2 + (b + 0.5 / self.beta) ** 2
         elif self.loss_type == "nca_pair":
             chosen_rewards = (policy_chosen_logps - reference_chosen_logps) * self.beta
             rejected_rewards = (policy_rejected_logps - reference_rejected_logps) * self.beta
-            losses = (
+            base_loss = (
                     -F.logsigmoid(chosen_rewards)
                     - 0.5 * F.logsigmoid(-chosen_rewards)
                     - 0.5 * F.logsigmoid(-rejected_rewards)
@@ -1071,6 +1064,12 @@ class SPOTrainer(Trainer):
             raise ValueError(
                 f"Unknown loss type: {self.loss_type}. Should be one of ['sigmoid', 'hinge', 'ipo', 'kto_pair', 'bco_pair', 'sppo_hard', 'nca_pair', 'robust']"
             )
+
+        # Adding the lambda term
+        log_pi_ratio = policy_chosen_logps - policy_rejected_logps
+        lambda_term = self.lambda_param * torch.log(1 + torch.exp(-log_pi_ratio))
+
+        losses = base_loss + lambda_term
 
         chosen_rewards = (
                 self.beta
