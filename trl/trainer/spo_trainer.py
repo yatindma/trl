@@ -1072,10 +1072,11 @@ class SPOTrainer(Trainer):
                 f"Unknown loss type: {self.loss_type}. Should be one of ['sigmoid', 'hinge', 'ipo', 'kto_pair', 'bco_pair', 'sppo_hard', 'nca_pair', 'robust']"
             )
 
-        # Adding the lambda term
-        lambda_term = self.lambda_param * torch.log(1 + torch.exp(-logits))
-
-        losses = losses + lambda_term
+        # Adding the new regularization term
+        log_ratio_diff = torch.log(policy_chosen_logps / reference_chosen_logps) - torch.log(
+            policy_rejected_logps / reference_rejected_logps)
+        regularization_term = self.lambda_param * F.softplus(-log_ratio_diff ** 2)
+        losses = losses + regularization_term
 
         chosen_rewards = (
                 self.beta
