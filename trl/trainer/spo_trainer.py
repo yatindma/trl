@@ -133,7 +133,7 @@ class SPOTrainer(Trainer):
         beta: float = 0.1,
         label_smoothing: float = 0,
         loss_type: Literal["sigmoid", "hinge", "ipo", "kto_pair", "bco_pair", "robust"] = "sigmoid",
-        lambda_param: float = 0.1,  # Add this line
+        lambda_param: float = 0.1,
         args: Optional[SPOConfig] = None,
         data_collator: Optional[DataCollator] = None,
         label_pad_token_id: int = -100,
@@ -1073,9 +1073,8 @@ class SPOTrainer(Trainer):
             )
 
         # Adding the new regularization term
-        log_ratio_diff = torch.log(policy_chosen_logps / reference_chosen_logps) - torch.log(
-            policy_rejected_logps / reference_rejected_logps)
-        regularization_term = self.lambda_param * F.softplus(-log_ratio_diff ** 2)
+        log_ratio_diff = (policy_chosen_logps - policy_rejected_logps)**2
+        regularization_term = self.lambda_param * torch.exp(-log_ratio_diff ** 2)
         losses = losses + regularization_term
 
         chosen_rewards = (
