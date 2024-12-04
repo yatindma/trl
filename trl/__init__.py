@@ -61,6 +61,8 @@ _import_structure = {
         "DataCollatorForCompletionOnlyLM",
         "DPOConfig",
         "DPOTrainer",
+        "SPOConfig",
+        "SPOTrainer",
         "FDivergenceConstants",
         "FDivergenceType",
         "GKDConfig",
