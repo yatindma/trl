@@ -216,6 +216,7 @@ class SPOTrainer(Trainer):
         optimizers: tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
         peft_config: Optional[dict] = None,
+        lambda_param: float = 0.01,
     ):
         if model is None:
             raise ValueError("No model provided. Please provide a model to train.")
@@ -347,6 +348,7 @@ class SPOTrainer(Trainer):
         self.model_adapter_name = args.model_adapter_name
         self.ref_adapter_name = args.ref_adapter_name
         self.reference_free = args.reference_free
+        self.lambda_param = lambda_param
 
         if ref_model:
             self.ref_model = ref_model
