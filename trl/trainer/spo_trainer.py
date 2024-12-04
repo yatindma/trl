@@ -1,4 +1,4 @@
-# DPO Authors: Rafael Rafailov, Archit Sharma, Eric Mitchell, Stefano Ermon, Christopher D. Manning, and Chelsea Finn 2023
+# SPO Authors: Rafael Rafailov, Archit Sharma, Eric Mitchell, Stefano Ermon, Christopher D. Manning, and Chelsea Finn 2023
 # Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -55,7 +55,7 @@ from transformers.utils.deprecation import deprecate_kwarg
 from ..data_utils import maybe_apply_chat_template, maybe_extract_prompt
 from ..models import PreTrainedModelWrapper, create_reference_model
 from .callbacks import SyncRefModelCallback
-from .dpo_config import DPOConfig, FDivergenceConstants, FDivergenceType
+from .spo_config import DPOConfig, FDivergenceConstants, FDivergenceType
 from .utils import (
     RunningMoments,
     cap_exp,
@@ -155,7 +155,7 @@ class PreferenceCollator(DataCollatorMixin):
         return output
 
 
-class DPOTrainer(Trainer):
+class SPOTrainer(Trainer):
     r"""
     Initialize DPOTrainer.
 
@@ -166,7 +166,7 @@ class DPOTrainer(Trainer):
             Hugging Face transformer model with a casual language modelling head. Used for implicit reward computation and loss. If no
             reference model is provided, the trainer will create a reference model with the same architecture as the model to be optimized.
         args (`DPOConfig`):
-            The DPO config arguments to use for training.
+            The SPO config arguments to use for training.
         data_collator (`transformers.DataCollator`):
             The data collator to use for training. If None is specified, the default data collator (`PreferenceCollator`) will be used
             which will pad the sequences to the maximum length of the sequences in the batch, given a dataset of paired sequences.
@@ -194,7 +194,7 @@ class DPOTrainer(Trainer):
             The PEFT configuration to use for training. If you pass a PEFT configuration, the model will be wrapped in a PEFT model.
     """
 
-    _tag_names = ["trl", "dpo"]
+    _tag_names = ["trl", "spo"]
 
     @deprecate_kwarg(
         "tokenizer", "0.16.0", "processing_class", warn_if_greater_or_equal_version=True, raise_if_both_names=True
@@ -285,7 +285,7 @@ class DPOTrainer(Trainer):
 
             if ref_model is not None and not args.force_use_ref_model:
                 raise ValueError(
-                    "You passed both a ref_model and a peft_config. For training PEFT adapters with DPO there is no need to pass a reference"
+                    "You passed both a ref_model and a peft_config. For training PEFT adapters with SPO there is no need to pass a reference"
                     " model. Please pass `ref_model=None` in case you want to train PEFT adapters, or pass a ref_model with `force_use_ref_model=True` in DPOTrainer's init."
                     " if you want to use a different ref_model."
                 )
@@ -357,7 +357,7 @@ class DPOTrainer(Trainer):
             self.ref_model = create_reference_model(model)
 
         if processing_class is None:
-            raise ValueError("processing_class must be specified to tokenize a DPO dataset.")
+            raise ValueError("processing_class must be specified to tokenize a SPO dataset.")
 
         if args.padding_value is not None:
             self.padding_value = args.padding_value
@@ -428,7 +428,7 @@ class DPOTrainer(Trainer):
         self.dataset_num_proc = args.dataset_num_proc
 
         # The trainer estimates the number of FLOPs (floating-point operations) using the number of elements in the
-        # input tensor associated with the key "input_ids". However, in DPO, the sampled data does not include the
+        # input tensor associated with the key "input_ids". However, in SPO, the sampled data does not include the
         # "input_ids" key. Instead, the available keys are "prompt_input_ids", "chosen_input_ids", and
         # "rejected_input_ids". As a result, the trainer issues the warning: "Could not estimate the number of tokens
         # of the input, floating-point operations will not be computed." To suppress this warning, we set the
@@ -521,7 +521,7 @@ class DPOTrainer(Trainer):
                 )
             if args.sync_ref_model:
                 raise ValueError(
-                    "You currently cannot use `ref_model=None` with TR-DPO method. Please provide `ref_model`."
+                    "You currently cannot use `ref_model=None` with TR-SPO method. Please provide `ref_model`."
                 )
         else:
             if self.is_deepspeed_enabled:
@@ -532,7 +532,7 @@ class DPOTrainer(Trainer):
         if args.sync_ref_model:
             if self.precompute_ref_log_probs:
                 raise ValueError(
-                    "You cannot use `precompute_ref_log_probs=True` with TR-DPO method. Please set `precompute_ref_log_probs=False`."
+                    "You cannot use `precompute_ref_log_probs=True` with TR-SPO method. Please set `precompute_ref_log_probs=False`."
                 )
 
             self.add_callback(SyncRefModelCallback(ref_model=self.ref_model, accelerator=self.accelerator))
@@ -799,7 +799,7 @@ class DPOTrainer(Trainer):
                 self.model.set_adapter(self.model_adapter_name or "default")
 
     def compute_ref_log_probs(self, batch: dict[str, torch.LongTensor]) -> dict:
-        """Computes log probabilities of the reference model for a single padded batch of a DPO specific dataset."""
+        """Computes log probabilities of the reference model for a single padded batch of a SPO specific dataset."""
         compte_ref_context_manager = amp.autocast("cuda") if self._peft_has_been_casted_to_bf16 else nullcontext()
         with torch.no_grad(), compte_ref_context_manager:
             if self.ref_model is None:
@@ -879,7 +879,7 @@ class DPOTrainer(Trainer):
 
         return output
 
-    def dpo_loss(
+    def spo_loss(
         self,
         chosen_logps: torch.FloatTensor,
         rejected_logps: torch.FloatTensor,
@@ -887,7 +887,7 @@ class DPOTrainer(Trainer):
         ref_rejected_logps: torch.FloatTensor,
     ) -> tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
         """
-        Compute the DPO loss for a batch of policy and reference model log probabilities.
+        Compute the SPO loss for a batch of policy and reference model log probabilities.
 
         Args:
             chosen_logps (`torch.FloatTensor`):
@@ -901,7 +901,7 @@ class DPOTrainer(Trainer):
 
         Returns:
             A tuple of three tensors: `(losses, chosen_rewards, rejected_rewards)`.
-            The losses tensor contains the DPO loss for each example in the batch.
+            The losses tensor contains the SPO loss for each example in the batch.
             The `chosen_rewards` and `rejected_rewards` tensors contain the rewards for the chosen and rejected
             responses, respectively.
         """
@@ -942,9 +942,9 @@ class DPOTrainer(Trainer):
                 # for the chosen and rejected samples, respectively.
                 logits -= F.softplus(chosen_logratios) - F.softplus(rejected_logratios)
 
-        # The beta is a temperature parameter for the DPO loss, typically something in the range of 0.1 to 0.5.
+        # The beta is a temperature parameter for the SPO loss, typically something in the range of 0.1 to 0.5.
         # We ignore the reference model as beta -> 0. The label_smoothing parameter encodes our uncertainty about the
-        # labels and calculates a conservative DPO loss.
+        # labels and calculates a conservative SPO loss.
         if self.loss_type == "sigmoid":
             losses = (
                 -F.logsigmoid(self.beta * logits) * (1 - self.label_smoothing)
@@ -1061,6 +1061,11 @@ class DPOTrainer(Trainer):
                 "'nca_pair', 'robust', 'bco_pair', 'sppo_hard', 'aot', 'aot_pair', 'discopop', 'apo_zero', 'apo_down']"
             )
 
+        # Adding the new regularization term
+        log_ratio_diff = (chosen_logps - rejected_logps)
+        regularization_term = self.lambda_param * torch.exp(-(log_ratio_diff ** 2))
+        losses = losses + regularization_term
+        
         chosen_rewards = self.beta * (chosen_logps.to(device) - ref_chosen_logps.to(device)).detach()
         rejected_rewards = self.beta * (rejected_logps.to(device) - ref_rejected_logps.to(device)).detach()
 
@@ -1213,7 +1218,7 @@ class DPOTrainer(Trainer):
         batch: dict[str, Union[list, torch.LongTensor]],
         train_eval: Literal["train", "eval"] = "train",
     ):
-        """Compute the DPO loss and other metrics for the given batch of inputs for train or test."""
+        """Compute the SPO loss and other metrics for the given batch of inputs for train or test."""
         metrics = {}
 
         model_output = self.concatenated_forward(model, batch)
@@ -1225,7 +1230,7 @@ class DPOTrainer(Trainer):
         else:
             ref_chosen_logps, ref_rejected_logps = self.compute_ref_log_probs(batch)
 
-        losses, chosen_rewards, rejected_rewards = self.dpo_loss(
+        losses, chosen_rewards, rejected_rewards = self.spo_loss(
             model_output["chosen_logps"], model_output["rejected_logps"], ref_chosen_logps, ref_rejected_logps
         )
         reward_accuracies = (chosen_rewards > rejected_rewards).float()
@@ -1484,7 +1489,7 @@ class DPOTrainer(Trainer):
             dataset_name=dataset_name,
             tags=tags,
             wandb_url=wandb.run.get_url() if is_wandb_available() and wandb.run is not None else None,
-            trainer_name="DPO",
+            trainer_name="SPO",
             trainer_citation=citation,
             paper_title="Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
             paper_id="2305.18290",
