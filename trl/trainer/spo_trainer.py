@@ -55,7 +55,7 @@ from transformers.utils.deprecation import deprecate_kwarg
 from ..data_utils import maybe_apply_chat_template, maybe_extract_prompt
 from ..models import PreTrainedModelWrapper, create_reference_model
 from .callbacks import SyncRefModelCallback
-from .spo_config import DPOConfig, FDivergenceConstants, FDivergenceType
+from .spo_config import SPOConfig, FDivergenceConstants, FDivergenceType
 from .utils import (
     RunningMoments,
     cap_exp,
@@ -157,7 +157,7 @@ class PreferenceCollator(DataCollatorMixin):
 
 class SPOTrainer(Trainer):
     r"""
-    Initialize DPOTrainer.
+    Initialize SPOTrainer.
 
     Args:
         model (`transformers.PreTrainedModel`):
@@ -165,7 +165,7 @@ class SPOTrainer(Trainer):
         ref_model (`PreTrainedModelWrapper`):
             Hugging Face transformer model with a casual language modelling head. Used for implicit reward computation and loss. If no
             reference model is provided, the trainer will create a reference model with the same architecture as the model to be optimized.
-        args (`DPOConfig`):
+        args (`SPOConfig`):
             The SPO config arguments to use for training.
         data_collator (`transformers.DataCollator`):
             The data collator to use for training. If None is specified, the default data collator (`PreferenceCollator`) will be used
@@ -203,7 +203,7 @@ class SPOTrainer(Trainer):
         self,
         model: Optional[Union[PreTrainedModel, nn.Module, str]] = None,
         ref_model: Optional[Union[PreTrainedModel, nn.Module, str]] = None,
-        args: Optional[DPOConfig] = None,
+        args: Optional[SPOConfig] = None,
         data_collator: Optional[DataCollator] = None,
         train_dataset: Optional[Dataset] = None,
         eval_dataset: Optional[Union[Dataset, dict[str, Dataset]]] = None,
@@ -230,7 +230,7 @@ class SPOTrainer(Trainer):
             model_init_kwargs = {}
         elif not isinstance(model, str):
             raise ValueError(
-                "You passed model_init_kwargs to the DPOTrainer/DPOConfig, but your model is already instantiated."
+                "You passed model_init_kwargs to the SPOTrainer/SPOConfig, but your model is already instantiated."
             )
         else:
             model_init_kwargs = args.model_init_kwargs
@@ -241,7 +241,7 @@ class SPOTrainer(Trainer):
                     torch_dtype = getattr(torch, torch_dtype)
                 if torch_dtype != "auto" and not isinstance(torch_dtype, torch.dtype):
                     raise ValueError(
-                        f"Invalid `torch_dtype` passed to the DPOConfig. Expected a string with either `torch.dtype` or 'auto', but got {torch_dtype}."
+                        f"Invalid `torch_dtype` passed to the SPOConfig. Expected a string with either `torch.dtype` or 'auto', but got {torch_dtype}."
                     )
                 model_init_kwargs["torch_dtype"] = torch_dtype
 
@@ -249,7 +249,7 @@ class SPOTrainer(Trainer):
             ref_model_init_kwargs = {}
         elif not isinstance(ref_model, str):
             raise ValueError(
-                "You passed ref_model_init_kwargs to the DPOTrainer/DPOConfig, but your ref_model is already instantiated."
+                "You passed ref_model_init_kwargs to the SPOTrainer/SPOConfig, but your ref_model is already instantiated."
             )
         else:
             ref_model_init_kwargs = args.ref_model_init_kwargs
@@ -260,7 +260,7 @@ class SPOTrainer(Trainer):
                     torch_dtype = getattr(torch, torch_dtype)
                 if torch_dtype != "auto" and not isinstance(torch_dtype, torch.dtype):
                     raise ValueError(
-                        f"Invalid `torch_dtype` passed to the DPOConfig. Expected a string with either `torch.dtype` or 'auto', but got {torch_dtype}."
+                        f"Invalid `torch_dtype` passed to the SPOConfig. Expected a string with either `torch.dtype` or 'auto', but got {torch_dtype}."
                     )
                 ref_model_init_kwargs["torch_dtype"] = torch_dtype
 
@@ -286,7 +286,7 @@ class SPOTrainer(Trainer):
             if ref_model is not None and not args.force_use_ref_model:
                 raise ValueError(
                     "You passed both a ref_model and a peft_config. For training PEFT adapters with SPO there is no need to pass a reference"
-                    " model. Please pass `ref_model=None` in case you want to train PEFT adapters, or pass a ref_model with `force_use_ref_model=True` in DPOTrainer's init."
+                    " model. Please pass `ref_model=None` in case you want to train PEFT adapters, or pass a ref_model with `force_use_ref_model=True` in SPOTrainer's init."
                     " if you want to use a different ref_model."
                 )
 
@@ -405,7 +405,7 @@ class SPOTrainer(Trainer):
                 UserWarning,
             )
         if args.loss_type == "kto_pair":
-            raise ValueError("Support for kto_pair has been removed in DPOTrainer. Please use KTOTrainer.")
+            raise ValueError("Support for kto_pair has been removed in SPOTrainer. Please use KTOTrainer.")
 
         self.beta = args.beta
         self.label_smoothing = args.label_smoothing
@@ -569,7 +569,7 @@ class SPOTrainer(Trainer):
         >>> from transformers import GPT2Tokenizer
         >>> tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         >>> features = {"prompt": "The sky is", "chosen": " blue", "rejected": " green"}
-        >>> DPOTrainer.tokenize_row(features, tokenizer, max_prompt_length=3, max_completion_length=3, add_special_tokens=False)
+        >>> SPOTrainer.tokenize_row(features, tokenizer, max_prompt_length=3, max_completion_length=3, add_special_tokens=False)
         {'prompt_input_ids': [464, 6766, 318], 'chosen_input_ids': [4171, 50256], 'rejected_input_ids': [4077, 50256]}
         ```
         """
@@ -677,7 +677,7 @@ class SPOTrainer(Trainer):
     def _set_signature_columns_if_needed(self):
         # If `self.args.remove_unused_columns` is True, non-signature columns are removed.
         # By default, this method sets `self._signature_columns` to the model's expected inputs.
-        # In DPOTrainer, we preprocess data, so using the model's signature columns doesn't work.
+        # In SPOTrainer, we preprocess data, so using the model's signature columns doesn't work.
         # Instead, we set them to the columns expected by `PreferenceCollator`, hence the override.
         if self._signature_columns is None:
             self._signature_columns = [
