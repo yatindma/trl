@@ -153,6 +153,8 @@ if TYPE_CHECKING:
         DataCollatorForCompletionOnlyLM,
         DPOConfig,
         DPOTrainer,
+        SPOConfig,
+        SPOTrainer,
         FDivergenceConstants,
         FDivergenceType,
         GKDConfig,
