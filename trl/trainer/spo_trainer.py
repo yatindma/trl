@@ -1064,9 +1064,31 @@ class SPOTrainer(Trainer):
             )
 
         # Adding the new regularization term
-        log_ratio_diff = (chosen_logps - rejected_logps)
-        regularization_term = self.lambda_param * torch.exp(-(log_ratio_diff ** 2))
-        losses = losses + regularization_term
+        # log_ratio_diff = (chosen_logps - rejected_logps)
+        # regularization_term = self.lambda_param * torch.exp(-(log_ratio_diff ** 2))
+        # losses = losses + regularization_term
+        
+        # Margin loss
+        # Compute log-ratio differences
+        log_ratio_diff = (chosen_logps - rejected_logps).to(device)
+
+        # Estimate and print range of log-ratio differences
+        min_log_ratio_diff = log_ratio_diff.min().item()
+        max_log_ratio_diff = log_ratio_diff.max().item()
+        mean_log_ratio_diff = log_ratio_diff.mean().item()
+        std_log_ratio_diff = log_ratio_diff.std().item()
+
+        # Print these values (use logger if you're running in a distributed environment)
+        print(f"Log-ratio diff stats -> Min: {min_log_ratio_diff}, Max: {max_log_ratio_diff}, Mean: {mean_log_ratio_diff}, Std: {std_log_ratio_diff}")
+
+        # Margin-based regularization term
+        margin = 1.0  # Set this to an appropriate value based on observed stats
+        margin_loss = self.lambda_param * torch.relu(margin - log_ratio_diff) ** 2
+
+        # Add the margin loss to the overall losses
+        losses = losses + margin_loss.mean()
+
+        
         
         chosen_rewards = self.beta * (chosen_logps.to(device) - ref_chosen_logps.to(device)).detach()
         rejected_rewards = self.beta * (rejected_logps.to(device) - ref_rejected_logps.to(device)).detach()
